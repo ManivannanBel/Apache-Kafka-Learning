@@ -30,7 +30,5 @@ public class ProducerDemo {
         producer.flush();
         //Flush and close producer
         producer.close();
-
-        System.out.println("Hello");
     }
 }
