@@ -1,4 +1,4 @@
-package apache.kafka.learning;
+package apache.kafka.learning1;
 
 import org.apache.kafka.clients.producer.*;
 import org.apache.kafka.common.serialization.StringSerializer;
