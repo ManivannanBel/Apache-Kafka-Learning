@@ -30,8 +30,8 @@ public class TwitterProducer {
 
     final String consumerKey = "kZT3T8RacT4g0knOIHJhj6kqa";
     final String consumerSecret = "pIdbx5lp5XFEd4Petjj1Yp6WrmgkwyiOg4m8Ejc0JNcicsFkdG";
-    final String token = "577124705-Ud5VaxDAStm4GpKZinNFwkzf9Pav7M17EEHV2Tcy";
-    final String secret = "3SRxLKpxK9dAODfq6v7IPNoupFEEXbfRupnuZtFKaX2BV";
+    final String token = "577124705-5xHAgCoEgLEkLrZTQej0gn5RHKSrjEUGjdekWLRZ";
+    final String secret = "L8fyZXoGUmQHpNst8ErYlhwtkgXcUMdt4VC3hgouuKPzr";
 
     public TwitterProducer(){
 
@@ -94,7 +94,7 @@ public class TwitterProducer {
         Hosts hosebirdHosts = new HttpHosts(Constants.STREAM_HOST);
         StatusesFilterEndpoint hosebirdEndpoint = new StatusesFilterEndpoint();
 
-        List<String> terms = Lists.newArrayList("kafka");
+        List<String> terms = Lists.newArrayList("udemy");
         hosebirdEndpoint.trackTerms(terms);
 
         // These secrets should be read from a config file
@@ -118,6 +118,12 @@ public class TwitterProducer {
         properties.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServer);
         properties.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         properties.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+
+        //Kafka safe producer properties
+        properties.setProperty(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
+        properties.setProperty(ProducerConfig.ACKS_CONFIG, "all");
+        properties.setProperty(ProducerConfig.RETRIES_CONFIG, Integer.toString(Integer.MAX_VALUE));
+        properties.setProperty(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, "5"); //Kafka 2.13 > kafka 0.1, so use 5 otherwise 1
 
         //Create kafka producer
         KafkaProducer<String, String> producer = new KafkaProducer<String, String>(properties);
