@@ -6,8 +6,15 @@ import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.CredentialsProvider;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.serialization.StringDeserializer;
 import org.elasticsearch.action.admin.indices.create.CreateIndexRequest;
 import org.elasticsearch.action.admin.indices.create.CreateIndexResponse;
+import org.elasticsearch.action.index.IndexRequest;
+import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestClientBuilder;
@@ -18,29 +25,67 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 
 public class ElasticsearchConsumer {
     public static void main(String[] args) throws IOException {
         Logger logger = LoggerFactory.getLogger(ElasticsearchConsumer.class.getName());
         RestHighLevelClient client = createClient();
 
-        String jsonString = "{\"foo\" : \"bar\"}";
+        //create kafka consumer
+        KafkaConsumer<String, String> consumer = createKafkaConsumer("twitter_topic");
 
-        CreateIndexRequest indexRequest = new CreateIndexRequest("twitter");
-        indexRequest.settings(Settings.builder()
-                .put("index.number_of_shards", 1)
-                .put("index.number_of_replicas", 2)
-        );
-        indexRequest.mapping("tweets", jsonString, XContentType.JSON);
-        CreateIndexResponse response = client.indices().create(indexRequest, RequestOptions.DEFAULT);
-        String id = response.index();
-        logger.info(id);
+        while(true){
+            ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
 
-        client.close();
+            for(ConsumerRecord<String, String> record : records){
+                String jsonString = record.value();
+
+                //Create index request for elastic search
+                IndexRequest indexRequest = new IndexRequest("twitter", "tweets").source(jsonString, XContentType.JSON);
+                //Create index
+                IndexResponse indexResponse = client.index(indexRequest, RequestOptions.DEFAULT);
+                String id = indexResponse.getId();
+                logger.info(id);
+                //Some delay of 1s
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        //client.close();
+    }
+
+    public static KafkaConsumer createKafkaConsumer(String topic){
+        String bootstrapServer = "127.0.0.1:9092";
+        String groupId = "my-twitter-application";
+
+        //Create properties
+        Properties properties = new Properties();
+        properties.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServer);
+        properties.setProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+        properties.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+        properties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+        properties.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest"); //earliest, latest, none
+
+        //Create consumer
+        KafkaConsumer<String, String> consumer = new KafkaConsumer<String, String>(properties);
+
+        //Subscribe to the topic
+        consumer.subscribe(Arrays.asList(topic));
+
+        return consumer;
     }
 
     public static RestHighLevelClient createClient(){
-        final String hostname = "https://o3fk8hv4yv:ec3pvgevd8@kafka-learning-4970476006.eu-central-1.bonsaisearch.net:443";
+        final String hostname = "kafka-learning-4970476006.eu-central-1.bonsaisearch.net";
         final String username = "o3fk8hv4yv";
         final String password = "ec3pvgevd8";
 
