@@ -35,6 +35,8 @@ public class ElasticsearchConsumer {
         CreateIndexResponse response = client.indices().create(indexRequest, RequestOptions.DEFAULT);
         String id = response.index();
         logger.info(id);
+
+        client.close();
     }
 
     public static RestHighLevelClient createClient(){
