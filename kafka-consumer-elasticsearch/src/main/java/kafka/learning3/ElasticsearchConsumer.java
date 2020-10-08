@@ -12,6 +12,7 @@ import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestClientBuilder;
 import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,6 +27,10 @@ public class ElasticsearchConsumer {
         String jsonString = "{\"foo\" : \"bar\"}";
 
         CreateIndexRequest indexRequest = new CreateIndexRequest("twitter");
+        indexRequest.settings(Settings.builder()
+                .put("index.number_of_shards", 1)
+                .put("index.number_of_replicas", 2)
+        );
         indexRequest.mapping("tweets", jsonString, XContentType.JSON);
         CreateIndexResponse response = client.indices().create(indexRequest, RequestOptions.DEFAULT);
         String id = response.index();
