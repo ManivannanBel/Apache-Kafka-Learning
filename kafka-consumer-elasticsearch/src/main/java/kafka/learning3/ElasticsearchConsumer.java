@@ -15,6 +15,8 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.elasticsearch.action.admin.indices.create.CreateIndexRequest;
 import org.elasticsearch.action.admin.indices.create.CreateIndexResponse;
+import org.elasticsearch.action.bulk.BulkRequest;
+import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.client.RequestOptions;
@@ -43,7 +45,10 @@ public class ElasticsearchConsumer {
 
         while(true){
             ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
-            logger.info("Received " + records.count() + " records");
+            int recordCount = records.count();
+            logger.info("Received " + recordCount + " records");
+
+            BulkRequest bulkRequests = new BulkRequest();
             for(ConsumerRecord<String, String> record : records){
                 String jsonString = record.value();
 
@@ -52,23 +57,32 @@ public class ElasticsearchConsumer {
                 //String id = record.topic() + "_" + record.partition() + "_" + record.offset();
 
                 //Use ID from Tweet JSON strategy 2
-                String id = extractTweeId(jsonString);
+                try{
+                    String id = extractTweeId(jsonString);
 
-                //Create index request for elastic search
-                IndexRequest indexRequest = new IndexRequest("twitter", "tweets", id).source(jsonString, XContentType.JSON);
-                //Create index
-                IndexResponse indexResponse = client.index(indexRequest, RequestOptions.DEFAULT);
-                logger.info(indexResponse.getId());
-                //Some delay of 10ms
-                try {
-                    Thread.sleep(10);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
+                    //Create index request for elastic search
+                    IndexRequest indexRequest = new IndexRequest("twitter", "tweets", id).source(jsonString, XContentType.JSON);
+                    bulkRequests.add(indexRequest);
+
+//                //Create index
+//                IndexResponse indexResponse = client.index(indexRequest, RequestOptions.DEFAULT);
+//                logger.info(indexResponse.getId());
+//                //Some delay of 10ms
+//                try {
+//                    Thread.sleep(10);
+//                } catch (InterruptedException e) {
+//                    e.printStackTrace();
+//                }
+                }catch (NullPointerException e){
+                    logger.warn("Skipping bad data : " + jsonString);
                 }
             }
-            logger.info("committing offsets....");
-            consumer.commitSync();
-            logger.info("Offsets have been committed");
+            if(recordCount > 0){
+                BulkResponse bulkItemResponses = client.bulk(bulkRequests, RequestOptions.DEFAULT);
+                logger.info("committing offsets....");
+                consumer.commitSync();
+                logger.info("Offsets have been committed");
+            }
             try {
                 Thread.sleep(1000);
             } catch (InterruptedException e) {
@@ -100,7 +114,7 @@ public class ElasticsearchConsumer {
         properties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         properties.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest"); //earliest, latest, none
         properties.setProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");  //We should commit manually
-        properties.setProperty(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "10");   //fetch at most 10 records per poll()
+        properties.setProperty(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "100");   //fetch at most 100 records per poll()
 
         //Create consumer
         KafkaConsumer<String, String> consumer = new KafkaConsumer<String, String>(properties);
