@@ -1,5 +1,7 @@
 package kafka.learning3;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonParser;
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
@@ -45,12 +47,18 @@ public class ElasticsearchConsumer {
             for(ConsumerRecord<String, String> record : records){
                 String jsonString = record.value();
 
+                //By passing id, we can make it idempotent (i.e, our system don't affected by duplicate messages)
+                //ID generation strategy 1 (generic kafka id)
+                //String id = record.topic() + "_" + record.partition() + "_" + record.offset();
+
+                //Use ID from Tweet JSON strategy 2
+                String id = extractTweeId(jsonString);
+
                 //Create index request for elastic search
-                IndexRequest indexRequest = new IndexRequest("twitter", "tweets").source(jsonString, XContentType.JSON);
+                IndexRequest indexRequest = new IndexRequest("twitter", "tweets", id).source(jsonString, XContentType.JSON);
                 //Create index
                 IndexResponse indexResponse = client.index(indexRequest, RequestOptions.DEFAULT);
-                String id = indexResponse.getId();
-                logger.info(id);
+                logger.info(indexResponse.getId());
                 //Some delay of 1s
                 try {
                     Thread.sleep(1000);
@@ -61,6 +69,15 @@ public class ElasticsearchConsumer {
         }
 
         //client.close();
+    }
+
+    public  static JsonParser jsonParser = new JsonParser();
+    public static String extractTweeId(String jsonString){
+        String id = jsonParser.parse(jsonString)
+                        .getAsJsonObject()
+                        .get("id_str")
+                        .getAsString();
+        return id;
     }
 
     public static KafkaConsumer createKafkaConsumer(String topic){
